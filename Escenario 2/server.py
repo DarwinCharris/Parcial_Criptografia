@@ -105,18 +105,22 @@ def start_server(host='10.20.17.46', port=65432):
                 conn.sendall(encrypted_key)
                 print('llave adicional enviada.')
 
-            iv = None
-            if parametros_iniciales[0] == 'CBC':
-                iv = get_random_bytes(16)
-            elif parametros_iniciales[0] == 'CTR':
-                iv = get_random_bytes(8)
-
-            if parametros_iniciales[0] in ['CBC', 'CTR']:
-                conn.sendall(iv)
 
             ready_to_continue = True
 
             while True and ready_to_continue:
+
+                #nonce
+                iv = None
+                if parametros_iniciales[0] == 'CBC':
+                    iv = get_random_bytes(16)
+                elif parametros_iniciales[0] == 'CTR':
+                    iv = get_random_bytes(8)
+
+
+                if parametros_iniciales[0] in ['CBC', 'CTR']:
+                    conn.sendall(iv)
+
                 ciphertext = conn.recv(1024)
                 if not ciphertext:
                     break
