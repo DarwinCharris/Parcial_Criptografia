@@ -17,7 +17,7 @@ def cliente():
     
     while True:
         mensaje = input("Cliente: ")
-        nonce = os.urandom(8 if algoritmo == 'salsa20' else 12)
+        nonce = os.urandom(8)
         cifrador = Salsa20.new(key=clave, nonce=nonce) if algoritmo == 'salsa20' else ChaCha20.new(key=clave, nonce=nonce)
         mensaje_cifrado = nonce + cifrador.encrypt(mensaje.encode())
         cliente_socket.send(mensaje_cifrado)
@@ -26,7 +26,7 @@ def cliente():
         if not respuesta_cifrada:
             break
         
-        nonce = respuesta_cifrada[:8] if algoritmo == 'salsa20' else respuesta_cifrada[:12]
+        nonce = respuesta_cifrada[:8] if algoritmo == 'salsa20' else respuesta_cifrada[:8]
         cifrador = Salsa20.new(key=clave, nonce=nonce) if algoritmo == 'salsa20' else ChaCha20.new(key=clave, nonce=nonce)
         respuesta_descifrada = cifrador.decrypt(respuesta_cifrada[len(nonce):])
         print(f"Servidor: {respuesta_descifrada.decode()}")
