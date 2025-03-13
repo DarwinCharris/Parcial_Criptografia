@@ -2,11 +2,11 @@ import socket
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad, pad
 
-def load_key(filename='key.bin'):
+def load_key(filename='key.bin'): #Funcion para cargar la llave
     with open(filename, 'rb') as key_file:
         return key_file.read()
     
-def setup_cipher(mode, key, iv):
+def setup_cipher(mode, key, iv): #Funcion para generar el cifrador segun el modo de cifrado
     if mode == "ECB":
         return AES.new(key, AES.MODE_ECB)
     elif mode == "CBC":
@@ -58,7 +58,7 @@ def decrypt_whitening(cipher, whitening_pre, whitening_post, ciphertext):
     return unpad(unwhitened, AES.block_size).decode('utf-8')
     
 def encrypt_mensaje(cipher, mensaje):
-    return cipher.encrypt(pad(mensaje.encode('utf-8'), AES.block_size))
+    return cipher.encrypt(pad(mensaje.encode('utf-8'), AES.block_size)) 
 
 def encrypt_double(cipher1, cipher2, mensaje):
     encripted_mensaje1 = cipher1.encrypt(pad(mensaje.encode('utf-8'), AES.block_size))
@@ -90,11 +90,12 @@ def decrypt_key(encrypted_key, shared_key):
     cipher = AES.new(shared_key, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(ciphertext), AES.block_size)
 
-def start_client(host='10.20.17.46', port=65432):
+def start_client(host='192.168.1.10', port=65432):
 
     ready_to_continue = False
 
     shared_key = load_key()
+    print(f'Valor de la llave: {shared_key.hex()}')
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as socket_client:
 
@@ -103,7 +104,7 @@ def start_client(host='10.20.17.46', port=65432):
 
         operation_mode = None
         while True:
-            operation_mode = input('Escriba el modo de operacion(ECB, CBC o CIR):')
+            operation_mode = input('Escriba el modo de operacion(ECB, CBC o CTR):')
             if operation_mode == 'ECB' or operation_mode == 'CBC' or operation_mode == 'CTR':
                 break
         seguridad_adicional = None
@@ -124,7 +125,7 @@ def start_client(host='10.20.17.46', port=65432):
                 encrypted_key = socket_client.recv(1024)
                 key = decrypt_key(encrypted_key, shared_key)
                 additional_keys.append(key)
-                print(f"Llave adicional descifrada. ")
+                print(f"Llave adicional descifrada: {encrypted_key.hex()}")
         elif seguridad_adicional == "cifrado triple":
             print("Recibiendo llaves adicionales cifradas. ")
             i = 0
@@ -133,7 +134,7 @@ def start_client(host='10.20.17.46', port=65432):
                 encrypted_key = socket_client.recv(1024)
                 key = decrypt_key(encrypted_key, shared_key)
                 additional_keys.append(key)
-                print(f"Llave adicional descifrada. ")
+                print(f"Llave adicional descifrada. {encrypted_key.hex()}")
         elif seguridad_adicional == "blanqueamiento de llave":
             print("Recibiendo llaves de blanqueamiento cifradas.")
             i = 0
@@ -142,7 +143,7 @@ def start_client(host='10.20.17.46', port=65432):
                 encrypted_key = socket_client.recv(1024)
                 key = decrypt_key(encrypted_key, shared_key)
                 additional_keys.append(key)
-                print("Recibiendo llaves de blanqueamiento cifradas.")
+                print(f"Llave adicional descifrada. {encrypted_key.hex()}")
 
 
         iv = None
@@ -158,6 +159,7 @@ def start_client(host='10.20.17.46', port=65432):
             cipher3 = setup_cipher(operation_mode, additional_keys[1], iv) if seguridad_adicional == 'cifrado triple' else None
 
             message = input('Escribir mensaje: ')
+            print(f'valor del mensaje: {message.encode('utf-8').hex()}')
             if seguridad_adicional == 'cifrado doble':
                 encrypted_mensaje = encrypt_double(cipher, cipher2, message)
             elif seguridad_adicional == 'cifrado triple':

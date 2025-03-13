@@ -120,7 +120,7 @@ def start_server(host='10.20.17.46', port=65432):
                 ciphertext = conn.recv(1024)
                 if not ciphertext:
                     break
-
+                print(f'valor del mensaje cifrado: {ciphertext.hex()}')
                 cipher = setup_cipher(parametros_iniciales[0], shared_key, iv)
                 cipher2 = setup_cipher(parametros_iniciales[0], additional_keys[0], iv) if parametros_iniciales[1] == 'cifrado doble' or parametros_iniciales[1] == 'cifrado triple' else None
                 cipher3 = setup_cipher(parametros_iniciales[0], additional_keys[1], iv) if parametros_iniciales[1] == 'cifrado triple' else None
@@ -134,6 +134,7 @@ def start_server(host='10.20.17.46', port=65432):
                 elif parametros_iniciales[1] == 'blanqueamiento de llave':
                     mensaje = decrypt_whitening(cipher, additional_keys[0], additional_keys[1], ciphertext)
                 print(f'mensaje del cliente: {mensaje}')
+                print(f'valor del mensaje: {mensaje.encode('utf-8').hex()}')
 
                 
                 cipher_respuesta = setup_cipher(parametros_iniciales[0],shared_key,iv)
