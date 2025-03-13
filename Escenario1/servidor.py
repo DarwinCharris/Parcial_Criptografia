@@ -23,14 +23,14 @@ def manejar_cliente(cliente_socket, clave, algoritmo):
                 nonce = mensaje_cifrado[:8]
                 cifrador = Salsa20.new(key=clave, nonce=nonce)
             else:
-                nonce = mensaje_cifrado[:12]
+                nonce = mensaje_cifrado[:8]
                 cifrador = ChaCha20.new(key=clave, nonce=nonce)
             
             mensaje_descifrado = cifrador.decrypt(mensaje_cifrado[len(nonce):])
             print(f"Cliente: {mensaje_descifrado.decode()}")
             
             respuesta = input("Servidor: ")
-            nuevo_nonce = os.urandom(8 if algoritmo == 'salsa20' else 12)
+            nuevo_nonce = os.urandom(8)
             cifrador = Salsa20.new(key=clave, nonce=nuevo_nonce) if algoritmo == 'salsa20' else ChaCha20.new(key=clave, nonce=nuevo_nonce)
             mensaje_enviado = nuevo_nonce + cifrador.encrypt(respuesta.encode())
             cliente_socket.send(mensaje_enviado)
