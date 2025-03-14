@@ -58,7 +58,7 @@ def decrypt_double(cipher1, cipher2, ciphertext):
 
     return unpad(cipher1.decrypt(decrypted_mensaje), AES.block_size).decode('utf-8')
 
-def decrypt_mensaje(cipher, ciphertext):
+def decrypt_mensaje(cipher, ciphertext): #Funcion para decifrar llaves
     return unpad(cipher.decrypt(ciphertext), AES.block_size).decode('utf-8')
 
 def encrypt_key(key_to_encrypt, key): #Metodo para encriptar llaves adicionales
@@ -69,10 +69,10 @@ def encrypt_key(key_to_encrypt, key): #Metodo para encriptar llaves adicionales
 def generate_key():
     return get_random_bytes(32)
 
-def start_server(host='10.20.17.46', port=65432):
+def start_server(host='192.168.1.13', port=65432):
 
     ready_to_continue = False
-
+    #Leer el archivo con la llave
     with open('key.bin', 'rb') as key_file:
         shared_key = key_file.read()
 
@@ -89,7 +89,7 @@ def start_server(host='10.20.17.46', port=65432):
             data = conn.recv(1024)
             parametros_iniciales = data.decode('utf-8').split(',')
             print(parametros_iniciales)
-
+            #Guardar las llaves adicionales(si aplica)
             additional_keys = []
             if parametros_iniciales[1] == 'cifrado doble':
                 additional_keys.append(generate_key())
@@ -99,20 +99,20 @@ def start_server(host='10.20.17.46', port=65432):
             elif parametros_iniciales[1] == 'blanqueamiento de llave':
                 additional_keys.append(get_random_bytes(32))
                 additional_keys.append(get_random_bytes(32))
-
+            #Enviar las llaves(cifradas) adiconales al cliente
             for key in additional_keys:
                 encrypted_key = encrypt_key(key, shared_key) 
                 conn.sendall(encrypted_key)
                 print('llave adicional enviada.')
 
-            iv = None
-            if parametros_iniciales[0] == 'CBC':
-                iv = get_random_bytes(16)
-            elif parametros_iniciales[0] == 'CTR':
-                iv = get_random_bytes(8)
+            #iv = None
+            #if parametros_iniciales[0] == 'CBC':
+            #    iv = get_random_bytes(16)
+            #elif parametros_iniciales[0] == 'CTR':
+            #    iv = get_random_bytes(8)
 
-            if parametros_iniciales[0] in ['CBC', 'CTR']:
-                conn.sendall(iv)
+            #if parametros_iniciales[0] in ['CBC', 'CTR']:
+            #    conn.sendall(iv)
 
             ready_to_continue = True
 
@@ -120,11 +120,20 @@ def start_server(host='10.20.17.46', port=65432):
                 ciphertext = conn.recv(1024)
                 if not ciphertext:
                     break
+
+
+                if parametros_iniciales[0] in ['CBC', 'CTR']:
+                    iv_length = 16 if parametros_iniciales[0] == 'CBC' else 8
+                    new_iv = ciphertext[:iv_length]
+                    ciphertext = ciphertext[iv_length:]
+                else:
+                    new_iv = None
+
                 print(f'valor del mensaje cifrado: {ciphertext.hex()}')
-                cipher = setup_cipher(parametros_iniciales[0], shared_key, iv)
-                cipher2 = setup_cipher(parametros_iniciales[0], additional_keys[0], iv) if parametros_iniciales[1] == 'cifrado doble' or parametros_iniciales[1] == 'cifrado triple' else None
-                cipher3 = setup_cipher(parametros_iniciales[0], additional_keys[1], iv) if parametros_iniciales[1] == 'cifrado triple' else None
-                
+                cipher = setup_cipher(parametros_iniciales[0], shared_key, new_iv)
+                cipher2 = setup_cipher(parametros_iniciales[0], additional_keys[0], new_iv) if parametros_iniciales[1] == 'cifrado doble' or parametros_iniciales[1] == 'cifrado triple' else None
+                cipher3 = setup_cipher(parametros_iniciales[0], additional_keys[1], new_iv) if parametros_iniciales[1] == 'cifrado triple' else None
+                #Descifrar segun el modo de operacion
                 if parametros_iniciales[1] == 'ninguna':
                     mensaje = decrypt_mensaje(cipher, ciphertext)
                 elif parametros_iniciales[1] == 'cifrado doble':
@@ -136,10 +145,18 @@ def start_server(host='10.20.17.46', port=65432):
                 print(f'mensaje del cliente: {mensaje}')
                 print(f'valor del mensaje: {mensaje.encode('utf-8').hex()}')
 
-                
-                cipher_respuesta = setup_cipher(parametros_iniciales[0],shared_key,iv)
-                cipher_respuesta2 = setup_cipher(parametros_iniciales[0],additional_keys[0],iv) if parametros_iniciales[1] == 'cifrado doble' or parametros_iniciales[1] == 'cifrado triple' else None
-                cipher_respuesta3 = setup_cipher(parametros_iniciales[0],additional_keys[1],iv) if parametros_iniciales[1] == 'cifrado triple' else None
+
+                if parametros_iniciales[0] == 'CBC':
+                    new_iv_resp = get_random_bytes(16)
+                elif parametros_iniciales[0] == 'CTR':
+                    new_iv_resp = get_random_bytes(8)
+                else:
+                    new_iv_resp = None
+
+                #Cifrar segun el modo de operacion
+                cipher_respuesta = setup_cipher(parametros_iniciales[0],shared_key,new_iv_resp)
+                cipher_respuesta2 = setup_cipher(parametros_iniciales[0],additional_keys[0],new_iv_resp) if parametros_iniciales[1] == 'cifrado doble' or parametros_iniciales[1] == 'cifrado triple' else None
+                cipher_respuesta3 = setup_cipher(parametros_iniciales[0],additional_keys[1],new_iv_resp) if parametros_iniciales[1] == 'cifrado triple' else None
                 respuesta = input('Respuesta a cliente: ')
                 if parametros_iniciales[1] == 'cifrado doble':
                     mensaje_encriptado = encrypt_double(cipher_respuesta, cipher_respuesta2, respuesta)
@@ -149,6 +166,10 @@ def start_server(host='10.20.17.46', port=65432):
                     mensaje_encriptado = encrypt_whitening(cipher_respuesta, additional_keys[0], additional_keys[1], respuesta)
                 else:
                     mensaje_encriptado = encrypt_mensaje(cipher_respuesta, respuesta)
+
+                if parametros_iniciales[0] in ['CBC', 'CTR']:
+                    mensaje_encriptado = new_iv_resp + mensaje_encriptado
+
                 conn.sendall(mensaje_encriptado)
 
 if __name__=='__main__':

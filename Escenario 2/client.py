@@ -1,6 +1,7 @@
 import socket 
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad, pad
+from Crypto.Random import get_random_bytes
 
 def load_key(filename='key.bin'): #Funcion para cargar la llave
     with open(filename, 'rb') as key_file:
@@ -90,7 +91,7 @@ def decrypt_key(encrypted_key, shared_key):
     cipher = AES.new(shared_key, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(ciphertext), AES.block_size)
 
-def start_client(host='192.168.1.10', port=65432):
+def start_client(host='192.168.1.13', port=65432):
 
     ready_to_continue = False
 
@@ -146,17 +147,24 @@ def start_client(host='192.168.1.10', port=65432):
                 print(f"Llave adicional descifrada. {encrypted_key.hex()}")
 
 
-        iv = None
-        if operation_mode in ["CBC", "CTR"]:
-            iv = socket_client.recv(16 if operation_mode == 'CBC' else 8)
+        #iv = None
+        #if operation_mode in ["CBC", "CTR"]:
+        #    iv = socket_client.recv(16 if operation_mode == 'CBC' else 8)
             
         ready_to_continue = True
 
         while True and ready_to_continue:
 
-            cipher = setup_cipher(operation_mode, shared_key, iv)
-            cipher2 = setup_cipher(operation_mode, additional_keys[0],iv) if seguridad_adicional == 'cifrado doble' or seguridad_adicional == 'cifrado triple' else None
-            cipher3 = setup_cipher(operation_mode, additional_keys[1], iv) if seguridad_adicional == 'cifrado triple' else None
+            if operation_mode == "CBC":
+                new_iv = get_random_bytes(16)
+            elif operation_mode == "CTR":
+                new_iv = get_random_bytes(8)
+            else:
+                new_iv = None
+
+            cipher = setup_cipher(operation_mode, shared_key, new_iv)
+            cipher2 = setup_cipher(operation_mode, additional_keys[0],new_iv) if seguridad_adicional == 'cifrado doble' or seguridad_adicional == 'cifrado triple' else None
+            cipher3 = setup_cipher(operation_mode, additional_keys[1], new_iv) if seguridad_adicional == 'cifrado triple' else None
 
             message = input('Escribir mensaje: ')
             print(f'valor del mensaje: {message.encode('utf-8').hex()}')
@@ -170,13 +178,24 @@ def start_client(host='192.168.1.10', port=65432):
                 encrypted_mensaje = encrypt_whitening(cipher, whitening_pre, whitening_post, message)
             else:
                 encrypted_mensaje = encrypt_mensaje(cipher, message)
+
+            if operation_mode in ['CBC', 'CTR']:
+                encrypted_mensaje = new_iv + encrypted_mensaje
+
             socket_client.sendall(encrypted_mensaje)
 
             encrypt_response = socket_client.recv(1024)
+
+            if operation_mode in ['CBC', 'CTR']:
+                iv_length = 16 if operation_mode == "CBC" else 8
+                recv_iv = encrypt_response[:iv_length]
+                encrypt_response = encrypt_response[iv_length:]
+            else:
+                recv_iv = None
    
-            cipher_respuesta = setup_cipher(operation_mode,shared_key,iv)
-            cipher_respuesta2 = setup_cipher(operation_mode,additional_keys[0],iv) if seguridad_adicional == 'cifrado doble' or seguridad_adicional == 'cifrado triple' else None
-            cipher_respuesta3 = setup_cipher(operation_mode, additional_keys[1], iv) if seguridad_adicional == 'cifrado triple' else None
+            cipher_respuesta = setup_cipher(operation_mode,shared_key,recv_iv)
+            cipher_respuesta2 = setup_cipher(operation_mode,additional_keys[0],recv_iv) if seguridad_adicional == 'cifrado doble' or seguridad_adicional == 'cifrado triple' else None
+            cipher_respuesta3 = setup_cipher(operation_mode, additional_keys[1], recv_iv) if seguridad_adicional == 'cifrado triple' else None
             if seguridad_adicional == 'cifrado doble':
                 response = decrypt_double(cipher_respuesta, cipher_respuesta2, encrypt_response)
             elif seguridad_adicional == 'cifrado triple':
